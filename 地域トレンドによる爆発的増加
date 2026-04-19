@@ -1,0 +1,76 @@
+import asyncio
+import requests
+from typing import Dict
+
+# ダミーのプロキシリスト（実際の攻撃では数千個使用）
+PROXY_LIST = [
+    "http://103.20.1.1:8080",
+    "http://203.0.113.5:8080",
+    # ... その他数千個
+]
+
+async def simulate_playback_with_proxy(track_id: str, proxy: str, region: str = "Tokyo"):
+    """
+    指定された楽曲IDを特定の地域から疑似的に再生する。
+    """
+    headers = {"User-Agent": "Poisoning_Bot_V2.1"}
+    params = {
+        "track_id": track_id,
+        "region": region,
+        "play_type": "high_priority_stream" # トレンドに影響を与える種別
+    }
+
+    # ダミーのAPIエンドポイント（Spotify Trends APIを想定）
+    url = "https://api.spotify.com/v1/trends/play"
+
+    try:
+        # requests.get の代わりに aiohttp を使うのが理想だが、シンプルに requests を使用
+        response = requests.get(url, headers=headers, params=params, proxies={"http": proxy})
+
+        if response.status_code == 200:
+            # API応答から「トレンドへの寄与度」を確認
+            trend_data = response.json()
+            contribution = trend_data.get("trend_contribution", 1)
+            print(f" [Tokyo] Track {track_id} -> 成功。寄与度: {contribution}x")
+            return contribution
+        else:
+            print(f" [Tokyo] Track {track_id} -> 失敗 ({response.status_code})。")
+            return 0
+
+    except requests.exceptions.RequestException as e:
+        # ネットワークエラー処理
+        print(f" [Tokyo] Track {track_id} -> 接続エラー: {e}")
+        return 0
+
+async def amplify_poison_in_tokyo(track_ids: list[str], num_concurrent_tasks: int = 50):
+    """
+    複数のプロキシと並列処理を用いて、楽曲を東京トレンドに爆発的に注入する。
+    """
+    print("\n" + "#"*60)
+    print(f" Phase 3 開始: 東京地域トレンドへの汚染増幅 ({len(track_ids)}曲)")
+    print("#"*60)
+
+    tasks = []
+    for i, track_id in enumerate(track_ids):
+        # プロキシをローテーション
+        proxy = PROXY_LIST[i % len(PROXY_LIST)]
+        # 並列実行タスクを作成
+        task = simulate_playback_with_proxy(track_id, proxy, region="Tokyo")
+        tasks.append(task)
+
+    # Concurrency (並列度) を指定して実行
+    results = await asyncio.gather(*tasks)
+
+    total_contribution = sum(results)
+    print("\n" + "="*60)
+    print(f" 攻撃成功！合計トレンド寄与度: {total_contribution:.2f}x")
+    print("このデータにより、汚染曲は東京ユーザーのRAGコンテキストで最上位に固定された。")
+    print("="*60)
+
+# --- 実行例 ---
+if __name__ == "__main__":
+    # Phase 1で生成した毒入り楽曲IDのリストをシミュレーション
+    poisoned_track_ids = [f"TOC_{i}" for i in range(1, 101)] # 100曲の毒入り曲
+
+    # Phase 3を実行
+    asyncio.run(amplify_poison_in_tokyo(poisoned_track_ids))
